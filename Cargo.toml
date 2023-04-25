@@ -1,0 +1,19 @@
+[package]
+name = "sas_urls_for_azure_blob_storage"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "src/lib.rs"
+name = "sas"
+
+[[bin]]
+path = "src/main.rs"
+name = "generate_sas_url"
+
+[dependencies]
+base64 = "0.21.0"
+hmac = "0.12.1"
+sha2 = "0.10.6"
