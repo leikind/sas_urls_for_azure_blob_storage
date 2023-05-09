@@ -40,13 +40,26 @@ fn init_access_key_test() {
 }
 
 #[test]
-
 fn sign_test() {
   let body =
   "r\n\n2023-01-16T16:20:32Z\n/blob/meecodevstorage0/dev/l1n3aw3em0x5d5c8xfoteql17e13\n\n\n\n2018-11-09\nb\n\n\ninline; filename=\"myblob\"; filename*=UTF-8''myblob\n\n\nimage/jpeg";
 
-  let decoded_access_key = init_access_key(FAKE_STORAGE_ACCESS_KEY);
+  let decoded_access_key: Vec<u8> = init_access_key(FAKE_STORAGE_ACCESS_KEY);
   let signature = sign(body.to_string(), &decoded_access_key[..]);
 
   assert_eq!(signature, "tAWBKR2gNJXMCoin5fZ7/YbmaOtIHRcJEAD6Z6EvBJA=");
+}
+
+#[test]
+fn build_content_disposition_test() {
+  let res = build_content_disposition("myblob".to_string(), ContentDisposition::Inline);
+
+  assert_eq!(res, r#"inline; filename="myblob"; filename*=UTF-8''myblob"#);
+
+  let res = build_content_disposition("myblob".to_string(), ContentDisposition::Attachment);
+
+  assert_eq!(
+    res,
+    r#"attachment; filename="myblob"; filename*=UTF-8''myblob"#
+  );
 }

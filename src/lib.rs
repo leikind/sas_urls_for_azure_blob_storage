@@ -19,6 +19,20 @@ impl fmt::Display for Permission {
   }
 }
 
+pub enum ContentDisposition {
+  Inline,
+  Attachment,
+}
+
+impl fmt::Display for ContentDisposition {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      ContentDisposition::Inline => write!(f, "inline"),
+      ContentDisposition::Attachment => write!(f, "attachment"),
+    }
+  }
+}
+
 pub struct SignableStringForServiceOptions {
   pub permissions: Permission,
   pub content_disposition: String,
@@ -56,7 +70,7 @@ pub fn sign(body: String, access_key: &[u8]) -> String {
   use sha2::Sha256;
   type HmacSha256 = Hmac<Sha256>;
 
-  let mut mac =
+  let mut mac: HmacSha256 =
     HmacSha256::new_from_slice(access_key).expect("failed to create a MAC out of the access key");
 
   mac.update(body.as_bytes());
@@ -64,4 +78,14 @@ pub fn sign(body: String, access_key: &[u8]) -> String {
   let result = mac.finalize().into_bytes();
 
   general_purpose::STANDARD.encode(result)
+}
+
+pub fn build_content_disposition(
+  filename: String,
+  content_disposition: ContentDisposition,
+) -> String {
+  format!(
+    r#"{}; filename="{}"; filename*=UTF-8''{}"#,
+    content_disposition, filename, filename
+  )
 }
