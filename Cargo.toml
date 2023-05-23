@@ -15,7 +15,12 @@ name = "generate_sas_url"
 
 [dependencies]
 base64 = "0.21.0"
+chrono = { version = "0.4.24"}
+# chrono = { default-features = false, version = "0.4.24", features = ["std", "time"] }
 hmac = "0.12.1"
 sha2 = "0.10.6"
 url = "2.3.1"
 urlencoding = "2.1.2"
+
+[dev-dependencies]
+regex = "1.8.2"

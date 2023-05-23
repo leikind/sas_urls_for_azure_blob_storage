@@ -117,3 +117,21 @@ pub fn map_to_http_params(keyword_list: KeywordList) -> String {
     .collect::<Vec<String>>()
     .join("&")
 }
+
+pub fn build_expiry(
+  now: Option<&str>,
+  expires_in: i64,
+) -> Result<String, Box<dyn std::error::Error>> {
+  use chrono::{DateTime, Duration, SecondsFormat, Timelike, Utc};
+
+  let start_from = match now {
+    None => Utc::now(),
+    Some(t) => t.parse::<DateTime<Utc>>()?,
+  };
+
+  let start_from = start_from.with_nanosecond(0).ok_or("Invalid datetime")?;
+  let expiration = start_from + Duration::seconds(expires_in);
+  let formatted = expiration.to_rfc3339_opts(SecondsFormat::Secs, true);
+
+  Ok(formatted)
+}

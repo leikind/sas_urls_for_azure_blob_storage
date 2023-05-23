@@ -104,3 +104,19 @@ fn map_to_http_params_test() {
   assert!(chunks.contains(&"sr=b"));
   assert!(chunks.contains(&"sig=2PS%2BTs2SEKi1OEvsSJ8QX8Q%2F0NN535otqnEYqXJVxkw%3D"));
 }
+
+#[test]
+fn build_expiry_with_specified_current_moment_test() {
+  let datetime_formatted = build_expiry(Some("2023-01-16 17:26:22.717865Z"), 360).unwrap();
+  assert_eq!(datetime_formatted, "2023-01-16T17:32:22Z");
+}
+
+#[test]
+fn build_expiry_test() {
+  use regex::Regex;
+
+  let datetime_formatted = build_expiry(None, 360).unwrap();
+
+  let re = Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ$").unwrap();
+  assert!(re.is_match(datetime_formatted.as_str()));
+}
