@@ -63,3 +63,44 @@ fn build_content_disposition_test() {
     r#"attachment; filename="myblob"; filename*=UTF-8''myblob"#
   );
 }
+
+#[test]
+fn build_uri_test() {
+  let uri = build_uri(
+    "meecodevstorage0".to_string(),
+    "dev".to_string(),
+    "w1n3aw3em0x5d5c8xfoteql17e1w".to_string(),
+  )
+  .unwrap();
+
+  assert_eq!(uri.scheme(), "https");
+  assert_eq!(uri.port(), None);
+  assert_eq!(uri.path(), "/dev/w1n3aw3em0x5d5c8xfoteql17e1w");
+  assert_eq!(uri.query(), None);
+
+  assert_eq!(
+    uri.host_str(),
+    Some("meecodevstorage0.blob.core.windows.net")
+  );
+}
+
+#[test]
+fn map_to_http_params_test() {
+  let params: KeywordList = vec![
+    ("sp", "rw"),
+    ("se", "2023-01-17T10:12:39Z"),
+    ("sv", "2018-11-09"),
+    ("sr", "b"),
+    ("sig", "2PS+Ts2SEKi1OEvsSJ8QX8Q/0NN535otqnEYqXJVxkw="),
+  ];
+
+  let query = map_to_http_params(params);
+
+  let chunks = query.split("&").collect::<Vec<&str>>();
+
+  assert!(chunks.contains(&"sp=rw"));
+  assert!(chunks.contains(&"se=2023-01-17T10%3A12%3A39Z"));
+  assert!(chunks.contains(&"sv=2018-11-09"));
+  assert!(chunks.contains(&"sr=b"));
+  assert!(chunks.contains(&"sig=2PS%2BTs2SEKi1OEvsSJ8QX8Q%2F0NN535otqnEYqXJVxkw%3D"));
+}

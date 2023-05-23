@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use std::fmt;
+use url::{ParseError, Url};
 
 const SERVICE_TYPE: &str = "blob";
 const RESOURCE: &str = "b";
@@ -75,6 +76,7 @@ pub fn sign(body: String, access_key: &[u8]) -> String {
 
   mac.update(body.as_bytes());
 
+  // GenericArray<u8, <T as OutputSizeUser>::OutputSize>
   let result = mac.finalize().into_bytes();
 
   general_purpose::STANDARD.encode(result)
@@ -88,4 +90,30 @@ pub fn build_content_disposition(
     r#"{}; filename="{}"; filename*=UTF-8''{}"#,
     content_disposition, filename, filename
   )
+}
+
+pub fn build_uri(
+  storage_account_name: String,
+  container: String,
+  key: String,
+) -> Result<Url, ParseError> {
+  let url_str = format!(
+    "https://{}.blob.core.windows.net/{}/{}",
+    storage_account_name, container, key
+  );
+
+  Url::parse(url_str.as_str())
+}
+
+pub type KeywordList<'a> = Vec<(&'a str, &'a str)>;
+
+// TODO rename, it is not a map
+pub fn map_to_http_params(keyword_list: KeywordList) -> String {
+  use urlencoding::encode;
+
+  keyword_list
+    .iter()
+    .map(|(k, v)| format!("{}={}", k, encode(v)))
+    .collect::<Vec<String>>()
+    .join("&")
 }
