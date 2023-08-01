@@ -208,3 +208,34 @@ pub fn generate_write_sas_url(
 
   Ok(signed_rw_url)
 }
+
+pub fn generate_readonly_sas_url(
+  storage_account_name: &str,
+  storage_access_key: &str,
+  container: &str,
+  key: &str,
+  expires_in: i64,
+  //
+  filename: &str,
+  content_disposition: ContentDisposition,
+  content_type: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+  let uri = build_uri(storage_account_name, container, key)?;
+  let expiry = build_expiry(None, expires_in)?;
+
+  let content_disposition = build_content_disposition(filename, content_disposition);
+
+  let opts = SignableStringForServiceOptions {
+    permissions: Permission::R,
+    content_disposition: Some(content_disposition.as_str()),
+    content_type: Some(content_type),
+    expiry: expiry.as_str(),
+  };
+
+  let sas_params =
+    generate_service_sas_token(uri.path(), storage_account_name, storage_access_key, opts);
+
+  let signed_rw_url = format!("{}?{}", uri.to_string(), sas_params);
+
+  Ok(signed_rw_url)
+}
