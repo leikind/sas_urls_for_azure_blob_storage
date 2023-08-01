@@ -1,5 +1,4 @@
 use base64::{engine::general_purpose, Engine as _};
-use std::fmt;
 use url::{ParseError, Url};
 
 const SERVICE_TYPE: &str = "blob";
@@ -11,12 +10,13 @@ pub enum Permission {
   RW,
 }
 
-impl fmt::Display for Permission {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      Permission::R => write!(f, "r"),
-      Permission::RW => write!(f, "rw"),
-    }
+impl ToString for Permission {
+  fn to_string(&self) -> String {
+    let s = match self {
+      Permission::R => "r",
+      Permission::RW => "rw",
+    };
+    s.to_string()
   }
 }
 
@@ -25,38 +25,57 @@ pub enum ContentDisposition {
   Attachment,
 }
 
-impl fmt::Display for ContentDisposition {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      ContentDisposition::Inline => write!(f, "inline"),
-      ContentDisposition::Attachment => write!(f, "attachment"),
+impl ToString for ContentDisposition {
+  fn to_string(&self) -> String {
+    let s = match self {
+      ContentDisposition::Inline => "inline",
+      ContentDisposition::Attachment => "attachment",
+    };
+    s.to_string()
+  }
+}
+
+pub struct SignableStringForServiceOptions<'a> {
+  pub permissions: Permission,
+  pub content_disposition: Option<&'a str>,
+  pub content_type: Option<&'a str>,
+  pub expiry: &'a str,
+}
+
+impl SignableStringForServiceOptions<'_> {
+  fn get_content_disposition(&self) -> &str {
+    match self.content_disposition {
+      Some(content_disposition) => content_disposition,
+      None => "",
+    }
+  }
+
+  fn get_content_type(&self) -> &str {
+    match self.content_type {
+      Some(content_type) => content_type,
+      None => "",
     }
   }
 }
 
-pub struct SignableStringForServiceOptions {
-  pub permissions: Permission,
-  pub content_disposition: String,
-  pub content_type: String,
-  pub expiry: String,
-}
-
 pub fn signable_string_for_service(
-  path: String,
-  storage_account_name: String,
-  options: SignableStringForServiceOptions,
+  path: &str,
+  storage_account_name: &str,
+  options: &SignableStringForServiceOptions,
 ) -> String {
+  let permissions = options.permissions.to_string();
+
   format!(
     "{}\n\n{}\n/{}/{}{}\n\n\n\n{}\n{}\n\n\n{}\n\n\n{}",
-    options.permissions,
+    permissions,
     options.expiry,
     SERVICE_TYPE,
     storage_account_name,
     path,
     VERSION,
     RESOURCE,
-    options.content_disposition,
-    options.content_type
+    options.get_content_disposition(),
+    options.get_content_type()
   )
 }
 
@@ -66,7 +85,7 @@ pub fn init_access_key(access_key: &str) -> Vec<u8> {
     .expect("invalid access key: not a valid Base64")
 }
 
-pub fn sign(body: String, access_key: &[u8]) -> String {
+pub fn sign(body: &str, access_key: &[u8]) -> String {
   use hmac::{Hmac, Mac};
   use sha2::Sha256;
   type HmacSha256 = Hmac<Sha256>;
@@ -83,19 +102,20 @@ pub fn sign(body: String, access_key: &[u8]) -> String {
 }
 
 pub fn build_content_disposition(
-  filename: String,
+  filename: &str,
   content_disposition: ContentDisposition,
 ) -> String {
+  let cd = content_disposition.to_string();
   format!(
     r#"{}; filename="{}"; filename*=UTF-8''{}"#,
-    content_disposition, filename, filename
+    cd, filename, filename
   )
 }
 
 pub fn build_uri(
-  storage_account_name: String,
-  container: String,
-  key: String,
+  storage_account_name: &str,
+  container: &str,
+  key: &str,
 ) -> Result<Url, ParseError> {
   let url_str = format!(
     "https://{}.blob.core.windows.net/{}/{}",
@@ -107,8 +127,7 @@ pub fn build_uri(
 
 pub type KeywordList<'a> = Vec<(&'a str, &'a str)>;
 
-// TODO rename, it is not a map
-pub fn map_to_http_params(keyword_list: KeywordList) -> String {
+pub fn key_value_list_to_http_params(keyword_list: KeywordList) -> String {
   use urlencoding::encode;
 
   keyword_list
@@ -134,4 +153,33 @@ pub fn build_expiry(
   let formatted = expiration.to_rfc3339_opts(SecondsFormat::Secs, true);
 
   Ok(formatted)
+}
+
+pub fn generate_service_sas_token(
+  path: &str,
+  storage_account_name: &str,
+  storage_access_key: &str,
+  options: SignableStringForServiceOptions,
+) -> String {
+  let signable_string_for_service =
+    signable_string_for_service(path, storage_account_name, &options);
+
+  let signature = sign(
+    signable_string_for_service.as_str(),
+    &init_access_key(storage_access_key),
+  );
+
+  let permissions = options.permissions.to_string();
+
+  let kv_list: KeywordList = vec![
+    ("sp", permissions.as_str()),
+    ("sr", RESOURCE),
+    ("sv", VERSION),
+    ("rscd", options.get_content_disposition()),
+    ("rsct", options.get_content_type()),
+    ("se", options.expiry),
+    ("sig", signature.as_str()),
+  ];
+
+  key_value_list_to_http_params(kv_list)
 }

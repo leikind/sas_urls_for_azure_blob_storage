@@ -8,17 +8,17 @@ const FAKE_STORAGE_ACCESS_KEY: &str =
 
 #[test]
 fn signable_string_for_service_test() {
-  let path = "/dev/l1n3aw3em0x5d5c8xfoteql17e13".to_string();
-  let storage_account_name = "meecodevstorage0".to_string();
+  let path = "/dev/l1n3aw3em0x5d5c8xfoteql17e13";
+  let storage_account_name = "meecodevstorage0";
 
   let options = SignableStringForServiceOptions {
     permissions: Permission::R,
-    content_disposition: "inline; filename=\"myblob\"; filename*=UTF-8''myblob".to_string(),
-    content_type: "image/jpeg".to_string(),
-    expiry: "2023-01-16T16:06:20Z".to_string(),
+    content_disposition: Some("inline; filename=\"myblob\"; filename*=UTF-8''myblob"),
+    content_type: Some("image/jpeg"),
+    expiry: "2023-01-16T16:06:20Z",
   };
 
-  let res = signable_string_for_service(path, storage_account_name, options);
+  let res = signable_string_for_service(path, storage_account_name, &options);
 
   assert_eq!(res, "r\n\n2023-01-16T16:06:20Z\n/blob/meecodevstorage0/dev/l1n3aw3em0x5d5c8xfoteql17e13\n\n\n\n2018-11-09\nb\n\n\ninline; filename=\"myblob\"; filename*=UTF-8''myblob\n\n\nimage/jpeg".to_string());
 }
@@ -45,18 +45,18 @@ fn sign_test() {
   "r\n\n2023-01-16T16:20:32Z\n/blob/meecodevstorage0/dev/l1n3aw3em0x5d5c8xfoteql17e13\n\n\n\n2018-11-09\nb\n\n\ninline; filename=\"myblob\"; filename*=UTF-8''myblob\n\n\nimage/jpeg";
 
   let decoded_access_key: Vec<u8> = init_access_key(FAKE_STORAGE_ACCESS_KEY);
-  let signature = sign(body.to_string(), &decoded_access_key[..]);
+  let signature = sign(body, &decoded_access_key[..]);
 
   assert_eq!(signature, "tAWBKR2gNJXMCoin5fZ7/YbmaOtIHRcJEAD6Z6EvBJA=");
 }
 
 #[test]
 fn build_content_disposition_test() {
-  let res = build_content_disposition("myblob".to_string(), ContentDisposition::Inline);
+  let res = build_content_disposition("myblob", ContentDisposition::Inline);
 
   assert_eq!(res, r#"inline; filename="myblob"; filename*=UTF-8''myblob"#);
 
-  let res = build_content_disposition("myblob".to_string(), ContentDisposition::Attachment);
+  let res = build_content_disposition("myblob", ContentDisposition::Attachment);
 
   assert_eq!(
     res,
@@ -66,12 +66,7 @@ fn build_content_disposition_test() {
 
 #[test]
 fn build_uri_test() {
-  let uri = build_uri(
-    "meecodevstorage0".to_string(),
-    "dev".to_string(),
-    "w1n3aw3em0x5d5c8xfoteql17e1w".to_string(),
-  )
-  .unwrap();
+  let uri = build_uri("meecodevstorage0", "dev", "w1n3aw3em0x5d5c8xfoteql17e1w").unwrap();
 
   assert_eq!(uri.scheme(), "https");
   assert_eq!(uri.port(), None);
@@ -85,7 +80,7 @@ fn build_uri_test() {
 }
 
 #[test]
-fn map_to_http_params_test() {
+fn key_value_list_to_http_params_test() {
   let params: KeywordList = vec![
     ("sp", "rw"),
     ("se", "2023-01-17T10:12:39Z"),
@@ -94,7 +89,7 @@ fn map_to_http_params_test() {
     ("sig", "2PS+Ts2SEKi1OEvsSJ8QX8Q/0NN535otqnEYqXJVxkw="),
   ];
 
-  let query = map_to_http_params(params);
+  let query = key_value_list_to_http_params(params);
 
   let chunks = query.split("&").collect::<Vec<&str>>();
 
@@ -119,4 +114,42 @@ fn build_expiry_test() {
 
   let re = Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ$").unwrap();
   assert!(re.is_match(datetime_formatted.as_str()));
+}
+
+#[test]
+fn generate_service_sas_token_test() {
+  let opts = SignableStringForServiceOptions {
+    permissions: Permission::R,
+    content_disposition: Some("inline; filename=\"myblob\"; filename*=UTF-8''myblob"),
+    content_type: Some("image/jpeg"),
+    expiry: "2023-01-17T10:59:48Z",
+  };
+
+  let res = generate_service_sas_token(
+    "/dev/w1n3aw3em0x5d5c8xfoteql17e1w",
+    "meecodevstorage0",
+    FAKE_STORAGE_ACCESS_KEY,
+    opts,
+  );
+
+  let chunks: Vec<&str> = res.split('&').collect();
+
+  // for c in &chunks {
+  //   println!("{}", c);
+  // }
+
+  assert_eq!(chunks.len(), 7);
+
+  assert!(chunks.contains(&"sp=r"));
+  assert!(chunks.contains(&"sr=b"));
+  assert!(chunks.contains(&"sv=2018-11-09"));
+  assert!(chunks.contains(&"rsct=image%2Fjpeg"));
+
+  assert!(chunks.contains(&"se=2023-01-17T10%3A59%3A48Z"));
+  assert!(chunks.contains(&"sig=UjzXp2R%2F8vNt4fFuKDa%2BefeUhJP6ruUPalTEcG5krZM%3D"));
+
+  // This is how Elixir does it:
+  // rscd=inline%3B+filename%3D%22myblob%22%3B+filename*%3DUTF-8%27%27myblob
+  assert!(chunks
+    .contains(&"rscd=inline%3B%20filename%3D%22myblob%22%3B%20filename%2A%3DUTF-8%27%27myblob"));
 }
