@@ -183,3 +183,28 @@ pub fn generate_service_sas_token(
 
   key_value_list_to_http_params(kv_list)
 }
+
+pub fn generate_write_sas_url(
+  storage_account_name: &str,
+  storage_access_key: &str,
+  container: &str,
+  key: &str,
+  expires_in: i64,
+) -> Result<String, Box<dyn std::error::Error>> {
+  let uri = build_uri(storage_account_name, container, key)?;
+  let expiry = build_expiry(None, expires_in)?;
+
+  let opts = SignableStringForServiceOptions {
+    permissions: Permission::RW,
+    content_disposition: None,
+    content_type: None,
+    expiry: expiry.as_str(),
+  };
+
+  let sas_params =
+    generate_service_sas_token(uri.path(), storage_account_name, storage_access_key, opts);
+
+  let signed_rw_url = format!("{}?{}", uri.to_string(), sas_params);
+
+  Ok(signed_rw_url)
+}
